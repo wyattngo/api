@@ -50,7 +50,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image, ImageFilter
-from diffusers import QwenImage21Pipeline, ZImagePipeline, FlowMatchEulerDiscreteScheduler
+from diffusers import QwenImage21Pipeline, ZImagePipeline, ZImageImg2ImgPipeline, FlowMatchEulerDiscreteScheduler
 
 # Prompt Enhancer: Qwen-Image-2.1-PE-I2I
 try:
@@ -226,6 +226,7 @@ cancel_events = {}
 
 qwen_pipeline = None
 zimage_pipeline = None
+zimage_img2img_pipeline = None  # shares weights with zimage_pipeline (from_pipe), so it costs no extra memory
 current_model = None
 
 
@@ -770,9 +771,10 @@ def unload_qwen_pipeline():
 
 
 def unload_models():
-    global qwen_pipeline, zimage_pipeline, current_model
+    global qwen_pipeline, zimage_pipeline, zimage_img2img_pipeline, current_model
     print("[MODEL] Unloading pipelines...")
     _drop_pipeline(qwen_pipeline)
+    zimage_img2img_pipeline = None  # a view over zimage_pipeline's modules; drop it before the real pipeline
     _drop_pipeline(zimage_pipeline)
     qwen_pipeline = None
     zimage_pipeline = None
@@ -862,6 +864,18 @@ def get_qwen_pipeline():
     print(f"Qwen-Image-2.1 loaded on {DEVICE}.")
     log_memory("AFTER LOAD")
     return qwen_pipeline
+
+
+ZIMAGE_EDIT_STRENGTH = float(os.environ.get("APP_ZIMAGE_EDIT_STRENGTH", "0.6"))
+
+
+def get_zimage_img2img_pipeline():
+    """Z-Image image-to-image, built on the already loaded text pipeline (same weights)."""
+    global zimage_img2img_pipeline
+    base = get_zimage_pipeline()
+    if zimage_img2img_pipeline is None:
+        zimage_img2img_pipeline = ZImageImg2ImgPipeline.from_pipe(base)
+    return zimage_img2img_pipeline
 
 
 def get_zimage_pipeline():
@@ -1471,7 +1485,16 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
         kwargs = image = g = None
         try:
             # quality="fine" runs plain text-to-image on Qwen (no reference image) instead of Z-Image.
-            if mode in ("edit", "transparent") or (mode == "text" and quality == "fine"):
+            if mode == "edit" and quality == "fast":
+                # Fast edit = Z-Image image-to-image: restyles the picture, does not follow instructions
+                # as precisely as Qwen. Needs one reference image.
+                if not refs:
+                    raise ValueError("Edit needs a reference image")
+                pipe = get_zimage_img2img_pipeline()
+                n_steps = 9
+                kwargs = {"prompt": prompt, "image": refs[0], "strength": ZIMAGE_EDIT_STRENGTH,
+                          "height": height, "width": width, "num_inference_steps": 9, "guidance_scale": 0.0}
+            elif mode in ("edit", "transparent") or (mode == "text" and quality == "fine"):
                 pipe = get_qwen_pipeline()
                 set_qwen_mode(pipe, False)
                 n_steps = steps
