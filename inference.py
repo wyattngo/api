@@ -1494,7 +1494,7 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
                 n_steps = 9
                 kwargs = {"prompt": prompt, "image": refs[0], "strength": ZIMAGE_EDIT_STRENGTH,
                           "height": height, "width": width, "num_inference_steps": 9, "guidance_scale": 0.0}
-            elif mode in ("edit", "transparent") or (mode == "text" and quality == "fine"):
+            elif mode in ("edit", "transparent", "compose") or (mode == "text" and quality == "fine"):
                 pipe = get_qwen_pipeline()
                 set_qwen_mode(pipe, False)
                 n_steps = steps

@@ -25,7 +25,8 @@ action = "generate" (mặc định)  — tương đương POST /generate
       mode "text":        fast = Z-Image (9 bước cố định), fine = Qwen text-to-image (dùng steps/cfg)
       mode "transparent": fast = chỉ rembg (tách nền, giữ kích thước ảnh gốc, cần 1 ảnh trong images),
                           fine = Qwen tạo ảnh RGBA
-      mode "edit":        luôn dùng Qwen
+      mode "edit":        fast = Z-Image image-to-image (1 ảnh), fine = Qwen
+      mode "compose":     ghép 2..10 ảnh bằng Qwen, chỉ có quality "fine"
 
 action = "batch"  — tương đương POST /generate-8-cases
     images (bắt buộc), aspect_ratio ("auto" mặc định), resolution, steps, seed, description,
@@ -111,7 +112,7 @@ def _env_float(name, default):
         return float(default)
 
 
-VALID_MODES = {"text", "edit", "transparent"}
+VALID_MODES = {"text", "edit", "transparent", "compose"}
 VALID_RESOLUTIONS = {1024, 1536, 2048}
 VALID_STEPS = {20, 30, 40}
 VALID_FORMATS = {"png", "webp", "jpeg"}
@@ -486,12 +487,19 @@ def action_generate(inp, job):
         raise BadInput("Image Edit mode requires a reference image.")
     if mode == "transparent" and quality == "fast":
         return _cutout_fast(refs, job, fmt, output)
+    if mode == "compose":
+        # Merge 2..N pictures into one with Qwen. There is no fast level: Z-Image's multi-image
+        # pipeline (Omni) needs a different checkpoint that this image does not ship.
+        if quality != "fine":
+            raise BadInput("Compose mode only supports quality 'fine'.")
+        if len(refs) < 2:
+            raise BadInput("Compose mode needs at least 2 reference images.")
 
     # Cùng pipeline chuẩn bị ảnh (rembg / crop / pad) với endpoint /generate.
-    refs = I.prepare_single_references(mode, refs, remove_bg, prompt)
+    refs = I.prepare_single_references("edit" if mode == "compose" else mode, refs, remove_bg, prompt)
 
     ratio_key = I.resolve_aspect(aspect_ratio, refs[0] if refs else None)
-    if mode in ("edit", "transparent"):
+    if mode in ("edit", "transparent", "compose"):
         width, height = I.get_dimensions(ratio_key, resolution)
     else:
         width, height = I.get_dimensions_long_side(ratio_key, resolution)
