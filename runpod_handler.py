@@ -389,9 +389,14 @@ def _job_progress(job_id):
 # JOB HELPERS
 # ============================================================
 def looks_like_oom(text):
+    """True when the worker should be replaced after this job: out of memory, or a CUDA fatal error.
+
+    A CUDA "device-side assert" poisons the whole CUDA context: every later job on the same worker
+    fails too (seen in production), so the worker must restart instead of taking the next job.
+    """
     text = (text or "").lower()
     return any(k in text for k in ("out of memory", "insufficient memory", "invalid buffer size",
-                                   "mps backend out"))
+                                   "mps backend out", "device-side assert", "cuda error"))
 
 
 def new_job(job_id, params, results=None):
