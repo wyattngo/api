@@ -1206,6 +1206,19 @@ def prepare_reference_set(images, remove_bg):
     return prepared, notes
 
 
+def cutout_fast(image):
+    """Quick background removal with rembg only (no diffusion model). Keeps the original size.
+
+    Returns (RGBA image, warning or None). Raises RuntimeError if rembg is not installed.
+    """
+    if rembg_remove is None:
+        raise RuntimeError("rembg chưa cài (pip install rembg onnxruntime)")
+    rgba = rembg_remove(image.convert("RGB"), session=get_rembg_session()).convert("RGBA")
+    if rgba.getchannel("A").point(lambda a: 255 if a > 16 else 0).getbbox() is None:
+        return rgba, "Không tách được vật thể: toàn bộ ảnh bị coi là nền."
+    return rgba, None
+
+
 def postprocess_transparent_output(image):
     """
     Đảm bảo output của mode Transparent có alpha nếu pipeline trả RGB.

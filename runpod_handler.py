@@ -21,8 +21,11 @@ action = "generate" (mặc định)  — tương đương POST /generate
     prompt (bắt buộc), mode: "text" | "edit" | "transparent", aspect_ratio, resolution
     (1024/1536/2048), steps (20/30/40), seed (-1 = ngẫu nhiên), cfg, negative_prompt,
     remove_bg (mặc định true). mode "edit" bắt buộc có images.
-    quality: "fast" (mặc định) | "fine". Chỉ có tác dụng với mode "text": fast = Z-Image
-    (9 bước cố định), fine = Qwen text-to-image (dùng steps/cfg). edit/transparent luôn dùng Qwen.
+    quality: "fast" (mặc định) | "fine".
+      mode "text":        fast = Z-Image (9 bước cố định), fine = Qwen text-to-image (dùng steps/cfg)
+      mode "transparent": fast = chỉ rembg (tách nền, giữ kích thước ảnh gốc, cần 1 ảnh trong images),
+                          fine = Qwen tạo ảnh RGBA
+      mode "edit":        luôn dùng Qwen
 
 action = "batch"  — tương đương POST /generate-8-cases
     images (bắt buộc), aspect_ratio ("auto" mặc định), resolution, steps, seed, description,
@@ -432,6 +435,32 @@ def parse_case_numbers(value):
 # ============================================================
 # ACTIONS
 # ============================================================
+def _cutout_fast(refs, job, fmt, output):
+    """quality=fast cho mode transparent: tách nền bằng rembg, không nạp model khuếch tán."""
+    if not refs:
+        raise BadInput("Xóa nền cần một ảnh trong 'images'.")
+    try:
+        cut, warning = I.cutout_fast(refs[0])
+    except RuntimeError as exc:
+        return {"error": str(exc)}
+    out_file = I.OUTPUT_DIR / f"{int(time.time())}_{uuid.uuid4().hex[:8]}.png"
+    I.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        cut.save(out_file, format="PNG")
+        images, warnings = package_images(job.get("id") or new_job_id(), [out_file], fmt, output)
+        response = {"success": True, "mode": "transparent", "quality": "fast", "seed": 0,
+                    "width": cut.width, "height": cut.height, "image": images[0]}
+        if warning:
+            warnings.append(warning)
+        if warnings:
+            response["warnings"] = warnings
+        return response
+    finally:
+        if not KEEP_FILES:
+            for f in out_file.parent.glob(out_file.stem + ".*"):
+                f.unlink(missing_ok=True)
+
+
 def action_generate(inp, job):
     prompt = str(inp.get("prompt") or "").strip()
     if not prompt:
@@ -455,6 +484,8 @@ def action_generate(inp, job):
     refs = load_images(inp)
     if mode == "edit" and not refs:
         raise BadInput("Image Edit mode requires a reference image.")
+    if mode == "transparent" and quality == "fast":
+        return _cutout_fast(refs, job, fmt, output)
 
     # Cùng pipeline chuẩn bị ảnh (rembg / crop / pad) với endpoint /generate.
     refs = I.prepare_single_references(mode, refs, remove_bg, prompt)
