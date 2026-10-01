@@ -21,6 +21,8 @@ action = "generate" (mặc định)  — tương đương POST /generate
     prompt (bắt buộc), mode: "text" | "edit" | "transparent", aspect_ratio, resolution
     (1024/1536/2048), steps (20/30/40), seed (-1 = ngẫu nhiên), cfg, negative_prompt,
     remove_bg (mặc định true). mode "edit" bắt buộc có images.
+    quality: "fast" (mặc định) | "fine". Chỉ có tác dụng với mode "text": fast = Z-Image
+    (9 bước cố định), fine = Qwen text-to-image (dùng steps/cfg). edit/transparent luôn dùng Qwen.
 
 action = "batch"  — tương đương POST /generate-8-cases
     images (bắt buộc), aspect_ratio ("auto" mặc định), resolution, steps, seed, description,
@@ -448,6 +450,7 @@ def action_generate(inp, job):
     cfg = as_bool(inp.get("cfg"), False)
     negative_prompt = str(inp.get("negative_prompt") or "")
     remove_bg = as_bool(inp.get("remove_bg"), True)
+    quality = pick(str(inp.get("quality") or "fast").strip().lower(), {"fast", "fine"}, "fast")
 
     refs = load_images(inp)
     if mode == "edit" and not refs:
@@ -466,14 +469,14 @@ def action_generate(inp, job):
     try:
         with ProgressPump(job, _single_progress):
             result = I._generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg,
-                                          negative_prompt)
+                                          negative_prompt, quality=quality)
         if not result.get("success"):
             err = result.get("error", "Unknown inference error")
             return {"error": err, **({"refresh_worker": True} if looks_like_oom(err) else {})}
 
         out_file = I.OUTPUT_DIR / result["filename"]
         images, warnings = package_images(job.get("id") or new_job_id(), [out_file], fmt, output)
-        response = {"success": True, "mode": mode, "seed": seed,
+        response = {"success": True, "mode": mode, "quality": quality, "seed": seed,
                     "width": result["width"], "height": result["height"],
                     "input_reference_processed": result.get("input_reference_processed", False),
                     "image": images[0]}

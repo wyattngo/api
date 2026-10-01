@@ -1451,13 +1451,14 @@ class QwenSession:
 # ============================================================
 # SINGLE GENERATION
 # ============================================================
-def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, negative_prompt):
+def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, negative_prompt, quality="fast"):
     error, payload = None, None
     try:
         progress.update({"running": True, "step": 0, "total": 0, "percent": 0, "message": "Loading model"})
         kwargs = image = g = None
         try:
-            if mode in ("edit", "transparent"):
+            # quality="fine" runs plain text-to-image on Qwen (no reference image) instead of Z-Image.
+            if mode in ("edit", "transparent") or (mode == "text" and quality == "fine"):
                 pipe = get_qwen_pipeline()
                 set_qwen_mode(pipe, False)
                 n_steps = steps
