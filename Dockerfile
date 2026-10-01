@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y \
 # ============================================================
 
 RUN python3 -m venv /opt/venv
+
 ENV PATH="/opt/venv/bin:$PATH"
 
 RUN pip install --upgrade \
@@ -41,10 +42,10 @@ RUN pip install --upgrade \
 # ============================================================
 
 RUN pip install \
-    torch==2.5.1 \
-    torchvision==0.20.1 \
-    torchaudio==2.5.1 \
-    --index-url https://download.pytorch.org/whl/cu124
+    torch==2.8.0 \
+    torchvision==0.23.0 \
+    torchaudio==2.8.0 \
+    --index-url https://download.pytorch.org/whl/cu128
 
 # ============================================================
 # DIFFUSERS — LOCAL SOURCE
