@@ -12,7 +12,7 @@ ENTRYPOINT []
 # ============================================================
 # DIFFUSERS — LOCAL SOURCE (bind mount: không để lại layer chứa source)
 # ============================================================
-RUN --mount=type=bind,source=diffusers,target=/tmp/diffusers \
+RUN --mount=type=bind,source=diffusers,target=/tmp/diffusers,rw \
     python3 -m pip install /tmp/diffusers
 
 # ============================================================
