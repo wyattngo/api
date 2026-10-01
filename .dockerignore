@@ -1,0 +1,14 @@
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+outputs
+uploads
+batch
+*.png
+*.jpg
+*.jpeg
+*.webp

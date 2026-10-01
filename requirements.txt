@@ -1,0 +1,12 @@
+runpod
+transformers
+accelerate
+huggingface_hub
+safetensors
+Pillow
+numpy
+psutil
+rembg
+onnxruntime
+sentencepiece
+protobuf
