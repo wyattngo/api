@@ -784,9 +784,23 @@ def unload_models():
     log_memory("AFTER UNLOAD")
 
 
+RUNPOD_CACHED_MODELS_DIR = "/runpod-volume/huggingface-cache/hub"
+
+
+def cached_models_dir(model_id):
+    """Runpod "Cached Models" keeps a model on the host disk under /runpod-volume/huggingface-cache/hub.
+    Returns that folder when it holds `model_id`, else None (falls back to the normal HF cache)."""
+    folder = os.path.join(RUNPOD_CACHED_MODELS_DIR, "models--" + model_id.replace("/", "--"))
+    return RUNPOD_CACHED_MODELS_DIR if os.path.isdir(folder) else None
+
+
 def load_pipeline(pipeline_cls, model_id):
     # SỬA LỖI (Kỹ thuật #1): Bắt buộc dùng `torch_dtype` theo chuẩn diffusers.
     # Việc dùng `dtype` sẽ khiến mô hình bị nạp ngầm bằng float32 gây tràn RAM.
+    cache_dir = cached_models_dir(model_id)
+    if cache_dir:
+        print(f"[MODEL] {model_id}: using Runpod cached model at {cache_dir}", flush=True)
+        return pipeline_cls.from_pretrained(model_id, torch_dtype=DTYPE, cache_dir=cache_dir)
     return pipeline_cls.from_pretrained(model_id, torch_dtype=DTYPE)
 
 

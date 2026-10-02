@@ -23,6 +23,22 @@ RUN python3 -m pip install -r /tmp/requirements.txt \
     && python3 -c "import torch; assert torch.__version__.startswith('2.8.0'), torch.__version__; print('torch', torch.__version__, 'cuda', torch.version.cuda)"
 
 # ============================================================
+# MODELS BAKED INTO THE IMAGE (cold start no longer downloads them)
+# Z-Image-Turbo (Apache-2.0) and the rembg ONNX model. Qwen-Image-2.1 is NOT baked in
+# (Qwen Research License): use Runpod "Cached Models" for it, see cached_models_dir() in inference.py.
+# The endpoint must not override HF_HOME / U2NET_HOME.
+# ============================================================
+ENV HF_HOME=/opt/hf
+ENV U2NET_HOME=/opt/u2net
+RUN python3 - <<'PY'
+from huggingface_hub import snapshot_download
+snapshot_download("Tongyi-MAI/Z-Image-Turbo")
+from rembg import new_session
+new_session("isnet-general-use")
+print("baked: Z-Image-Turbo + isnet-general-use")
+PY
+
+# ============================================================
 # APPLICATION
 # ============================================================
 WORKDIR /app
