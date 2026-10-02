@@ -10,3 +10,4 @@ rembg
 onnxruntime
 sentencepiece
 protobuf
+peft
