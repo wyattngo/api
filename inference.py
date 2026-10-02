@@ -874,7 +874,9 @@ def get_zimage_img2img_pipeline():
     global zimage_img2img_pipeline
     base = get_zimage_pipeline()
     if zimage_img2img_pipeline is None:
-        zimage_img2img_pipeline = ZImageImg2ImgPipeline.from_pipe(base)
+        # Built straight from the loaded components: from_pipe() calls .to(dtype) on every module, which
+        # re-allocates the whole model (CUDA OOM on 24 GB cards, NVML assert on MIG slices).
+        zimage_img2img_pipeline = ZImageImg2ImgPipeline(**base.components)
     return zimage_img2img_pipeline
 
 
