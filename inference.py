@@ -1501,23 +1501,14 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
         kwargs = image = g = None
         try:
             # quality="fine" runs plain text-to-image on Qwen (no reference image) instead of Z-Image.
-            if mode == "edit" and quality == "fast":
-                # Fast edit = Z-Image image-to-image: restyles the picture, does not follow instructions
-                # as precisely as Qwen. Needs one reference image.
-                if not refs:
-                    raise ValueError("Edit needs a reference image")
-                pipe = get_zimage_img2img_pipeline()
-                n_steps = 9
-                # The img2img pipeline does not rescale the source: its latents must match width x height.
-                src = refs[0].convert("RGB").resize((width, height), Image.LANCZOS)
-                kwargs = {"prompt": prompt, "image": src, "strength": ZIMAGE_EDIT_STRENGTH,
-                          "height": height, "width": width, "num_inference_steps": 9, "guidance_scale": 0.0}
-            elif mode in ("edit", "transparent", "compose") or (mode == "text" and quality == "fine"):
+            if mode in ("edit", "transparent", "compose") or (mode == "text" and quality == "fine"):
                 pipe = get_qwen_pipeline()
-                set_qwen_mode(pipe, False)
-                n_steps = steps
+                # Fast edit = Qwen with the 6-step turbo LoRA (no true CFG). Falls back to the full
+                # schedule when the LoRA could not be loaded.
+                turbo = set_qwen_mode(pipe, mode == "edit" and quality == "fast")
+                n_steps = TURBO_STEPS if turbo else steps
                 final_prompt = build_rgba_prompt(prompt) if mode == "transparent" else prompt
-                kwargs = {"prompt": final_prompt, "height": height, "width": width, "num_inference_steps": steps}
+                kwargs = {"prompt": final_prompt, "height": height, "width": width, "num_inference_steps": n_steps}
                 if refs:
                     kwargs["image"] = refs[0] if len(refs) == 1 else refs
                     if mode == "transparent":
@@ -1529,7 +1520,7 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
                             f"source=prepared_reference",
                             flush=True,
                         )
-                if cfg:
+                if cfg and not turbo:
                     kwargs["true_cfg_scale"] = 4.0
                     if negative_prompt.strip():
                         kwargs["negative_prompt"] = negative_prompt.strip()
