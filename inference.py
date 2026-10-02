@@ -1494,7 +1494,9 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
                     raise ValueError("Edit needs a reference image")
                 pipe = get_zimage_img2img_pipeline()
                 n_steps = 9
-                kwargs = {"prompt": prompt, "image": refs[0], "strength": ZIMAGE_EDIT_STRENGTH,
+                # The img2img pipeline does not rescale the source: its latents must match width x height.
+                src = refs[0].convert("RGB").resize((width, height), Image.LANCZOS)
+                kwargs = {"prompt": prompt, "image": src, "strength": ZIMAGE_EDIT_STRENGTH,
                           "height": height, "width": width, "num_inference_steps": 9, "guidance_scale": 0.0}
             elif mode in ("edit", "transparent", "compose") or (mode == "text" and quality == "fine"):
                 pipe = get_qwen_pipeline()
