@@ -102,6 +102,11 @@ if "all" in FLUX_FEATURES:
 FLUX_FEATURES &= _FLUX_ALL
 
 
+# A worker image that only ships FLUX (Dockerfile.flux): loading Qwen or Z-Image there would evict klein and
+# then run out of GPU memory, so refuse with a clear error instead.
+FLUX_ONLY = os.environ.get("APP_FLUX_ONLY", "0") == "1"
+
+
 def flux_enabled(feature):
     return feature in FLUX_FEATURES or (feature == "text" and FAST_TEXT_MODEL == "flux2-klein")
 
@@ -902,6 +907,8 @@ def get_qwen_pipeline():
     if qwen_pipeline is not None:
         current_model = "qwen-2.1"
         return qwen_pipeline
+    if FLUX_ONLY:
+        raise RuntimeError('This worker only runs FLUX.2 klein; use quality "flux" (Qwen is not available here).')
     unload_models()
     print("=" * 60)
     print("Loading Qwen-Image-2.1...")
@@ -934,6 +941,8 @@ def get_zimage_pipeline():
     if zimage_pipeline is not None:
         current_model = "zimage"
         return zimage_pipeline
+    if FLUX_ONLY:
+        raise RuntimeError('This worker only runs FLUX.2 klein; Z-Image is not available here.')
     unload_models()
     print("=" * 60)
     print("Loading Z-Image-Turbo...")

@@ -74,3 +74,12 @@ def test_compose_uses_klein_with_all_refs(monkeypatch):
 def test_all_expands(monkeypatch):
     monkeypatch.setattr(I, "FLUX_FEATURES", set(I._FLUX_ALL))
     assert all(I.flux_enabled(f) for f in ("text", "edit", "compose", "batch", "rerender"))
+
+
+def test_flux_only_worker_refuses_qwen_instead_of_running_out_of_memory(monkeypatch):
+    import pytest
+    monkeypatch.setattr(I, "FLUX_ONLY", True)
+    monkeypatch.setattr(I, "qwen_pipeline", None)
+    monkeypatch.setattr(I, "unload_models", lambda: (_ for _ in ()).throw(AssertionError("klein evicted")))
+    with pytest.raises(RuntimeError, match="only runs FLUX"):
+        I.get_qwen_pipeline()

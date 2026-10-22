@@ -61,6 +61,7 @@ ENV APP_PROMPT_ENHANCER=0
 # Trial: text/fast runs FLUX.2 klein; 24 GB card, keep the model on the GPU
 ENV APP_FAST_TEXT_MODEL=flux2-klein
 ENV APP_FLUX_FEATURES=all
+ENV APP_FLUX_ONLY=1
 ENV APP_CPU_OFFLOAD=0
 ENV RUNPOD_PRELOAD=flux2klein
 
