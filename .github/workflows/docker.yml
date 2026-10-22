@@ -1,9 +1,7 @@
 name: Build and Push Runpod Image
 
+# Manual only (2026-10-22): a push to main no longer rebuilds runpod-cutin:latest.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 env:
