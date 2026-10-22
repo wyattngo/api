@@ -555,7 +555,9 @@ def action_batch(inp, job):
     remove_bg = as_bool(inp.get("remove_bg"), True)
     mode = pick(str(inp.get("mode", "draft")).strip().lower(), {"draft", "final"}, "draft")
     prompt_enhance = as_bool(inp.get("prompt_enhance"), True)
-    use_flux = str(inp.get("quality") or "").strip().lower() == "flux"
+    # draft = the quick preview set: FLUX when "batch" is on; the final level stays on Qwen
+    use_flux = str(inp.get("quality") or "").strip().lower() == "flux" or (
+        mode == "draft" and I.flux_enabled("batch"))
 
     aspect_auto = aspect_in == "auto"
     aspect_ratio = I.resolve_aspect(aspect_in, images[0])
