@@ -493,17 +493,19 @@ def action_generate(inp, job):
     cfg = as_bool(inp.get("cfg"), False)
     negative_prompt = str(inp.get("negative_prompt") or "")
     remove_bg = as_bool(inp.get("remove_bg"), True)
-    quality = pick(str(inp.get("quality") or "fast").strip().lower(), {"fast", "fine"}, "fast")
+    quality = pick(str(inp.get("quality") or "fast").strip().lower(), {"fast", "fine", "flux"}, "fast")
 
     refs = load_images(inp)
     if mode == "edit" and not refs:
         raise BadInput("Image Edit mode requires a reference image.")
+    if mode == "transparent" and quality == "flux":
+        raise BadInput("Transparent mode has no FLUX quality (FLUX cannot output alpha).")
     if mode == "transparent" and quality == "fast":
         return _cutout_fast(refs, job, fmt, output)
     if mode == "compose":
         # Merge 2..N pictures into one with Qwen. There is no fast level: Z-Image's multi-image
         # pipeline (Omni) needs a different checkpoint that this image does not ship.
-        if quality != "fine" and not I.flux_enabled("compose"):
+        if quality not in ("fine", "flux") and not I.flux_enabled("compose"):
             raise BadInput("Compose mode only supports quality 'fine'.")
         if len(refs) < 2:
             raise BadInput("Compose mode needs at least 2 reference images.")
@@ -563,6 +565,7 @@ def action_batch(inp, job):
     remove_bg = as_bool(inp.get("remove_bg"), True)
     mode = pick(str(inp.get("mode", "draft")).strip().lower(), {"draft", "final"}, "draft")
     prompt_enhance = as_bool(inp.get("prompt_enhance"), True)
+    use_flux = str(inp.get("quality") or "").strip().lower() == "flux"
 
     aspect_auto = aspect_in == "auto"
     aspect_ratio = I.resolve_aspect(aspect_in, images[0])
@@ -578,7 +581,7 @@ def action_batch(inp, job):
     try:
         with ProgressPump(job, _job_progress(job_id)):
             I.run_8_cases(job_id, images, aspect_ratio, resolution, steps, seed, description,
-                          remove_bg, mode, prompt_enhance, aspect_auto, category)
+                          remove_bg, mode, prompt_enhance, aspect_auto, category, use_flux)
 
         j = I.get_job(job_id) or {}
         status = j.get("status")

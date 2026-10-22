@@ -1605,8 +1605,9 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
         kwargs = image = g = None
         try:
             # quality="fine" runs plain text-to-image on Qwen (no reference image) instead of Z-Image.
-            use_klein_ref = ((mode == "edit" and quality == "fast" and flux_enabled("edit"))
-                             or (mode == "compose" and flux_enabled("compose")))
+            use_klein_ref = (mode in ("edit", "compose") and quality == "flux") or (
+                (mode == "edit" and quality == "fast" and flux_enabled("edit"))
+                or (mode == "compose" and flux_enabled("compose")))
             if use_klein_ref:
                 # FLUX.2 klein takes one or many reference images natively (edit / multi-image compose).
                 unload_qwen_pipeline()
@@ -1639,7 +1640,7 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
                     kwargs["true_cfg_scale"] = 4.0
                     if negative_prompt.strip():
                         kwargs["negative_prompt"] = negative_prompt.strip()
-            elif flux_enabled("text"):
+            elif flux_enabled("text") or quality == "flux":
                 pipe = get_klein_pipeline()
                 n_steps = KLEIN_STEPS
                 kwargs = {"prompt": prompt, "height": height, "width": width,
@@ -1684,7 +1685,7 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
 # ============================================================
 def run_8_cases(job_id, product_images, aspect_ratio, resolution, steps, seed,
                 description, remove_bg, mode, prompt_enhance=True, aspect_auto=False,
-                category=product_category.GENERIC):
+                category=product_category.GENERIC, use_flux=False):
     case_dir = BATCH_DIR / job_id
     cancel = cancel_events.get(job_id) or threading.Event()
     started = time.time()
@@ -1756,7 +1757,7 @@ def run_8_cases(job_id, product_images, aspect_ratio, resolution, steps, seed,
             update_batch(job_id, status="cancelled", percent=100,
                          message="Đã huỷ trước khi load Qwen.", persist=True)
             return
-        use_klein = flux_enabled("batch")
+        use_klein = use_flux or flux_enabled("batch")
         update_batch(job_id, status="running", percent=20 if prompt_enhance else 0,
                      message="Loading FLUX.2 klein" if use_klein else "Loading Qwen-Image-2.1", persist=True)
         session = (KleinSession if use_klein else QwenSession)(
