@@ -95,7 +95,7 @@ KLEIN_MODEL_ID = os.environ.get("APP_KLEIN_MODEL_ID", "black-forest-labs/FLUX.2-
 FAST_TEXT_MODEL = os.environ.get("APP_FAST_TEXT_MODEL", "zimage").strip().lower()
 KLEIN_STEPS = 4
 # Which features run on FLUX.2 klein instead of Qwen/Z-Image: comma list of
-# text, edit, compose, batch, rerender (or "all"). Empty = unchanged behaviour.
+# text, edit (Tinh level), compose, batch (draft), rerender (or "all"). Empty = unchanged behaviour.
 # APP_FAST_TEXT_MODEL=flux2-klein is the old spelling of "text".
 _FLUX_ALL = {"text", "edit", "compose", "batch", "rerender"}
 FLUX_FEATURES = {f.strip() for f in os.environ.get("APP_FLUX_FEATURES", "").lower().split(",") if f.strip()}
@@ -1605,8 +1605,10 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
         kwargs = image = g = None
         try:
             # quality="fine" runs plain text-to-image on Qwen (no reference image) instead of Z-Image.
+            # "Tinh" (fine) edit and every compose run on FLUX.2 klein when the feature is on;
+            # quality "flux" asks for it explicitly. Fast edit stays on Qwen turbo.
             use_klein_ref = (mode in ("edit", "compose") and quality == "flux") or (
-                (mode == "edit" and quality == "fast" and flux_enabled("edit"))
+                (mode == "edit" and quality == "fine" and flux_enabled("edit"))
                 or (mode == "compose" and flux_enabled("compose")))
             if use_klein_ref:
                 # FLUX.2 klein takes one or many reference images natively (edit / multi-image compose).
@@ -1757,7 +1759,7 @@ def run_8_cases(job_id, product_images, aspect_ratio, resolution, steps, seed,
             update_batch(job_id, status="cancelled", percent=100,
                          message="Đã huỷ trước khi load Qwen.", persist=True)
             return
-        use_klein = use_flux or flux_enabled("batch")
+        use_klein = use_flux
         update_batch(job_id, status="running", percent=20 if prompt_enhance else 0,
                      message="Loading FLUX.2 klein" if use_klein else "Loading Qwen-Image-2.1", persist=True)
         session = (KleinSession if use_klein else QwenSession)(

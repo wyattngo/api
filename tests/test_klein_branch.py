@@ -59,9 +59,9 @@ def run_ref(monkeypatch, mode, quality, features, refs):
     return fake.kwargs
 
 
-def test_edit_fast_uses_klein(monkeypatch):
+def test_edit_fine_uses_klein(monkeypatch):
     img = Image.new("RGB", (8, 8))
-    kw = run_ref(monkeypatch, "edit", "fast", {"edit"}, [img])
+    kw = run_ref(monkeypatch, "edit", "fine", {"edit"}, [img])
     assert kw["image"] is img and kw["num_inference_steps"] == 4
 
 
