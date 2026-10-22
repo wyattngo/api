@@ -51,6 +51,10 @@ import numpy as np
 import torch
 from PIL import Image, ImageFilter
 from diffusers import QwenImage21Pipeline, ZImagePipeline, ZImageImg2ImgPipeline, FlowMatchEulerDiscreteScheduler
+try:
+    from diffusers import Flux2KleinPipeline
+except ImportError:  # older diffusers: only the klein trial endpoint needs it
+    Flux2KleinPipeline = None
 
 # Prompt Enhancer: Qwen-Image-2.1-PE-I2I
 try:
@@ -83,6 +87,11 @@ APP_VERSION = "4.5-fixed-r4"
 # Dùng thương mại cần xin license riêng từ Qwen - đọc file LICENSE trong repo trước khi ra sản phẩm.
 QWEN_MODEL_ID = "Qwen/Qwen-Image-2.1"
 ZIMAGE_MODEL_ID = "Tongyi-MAI/Z-Image-Turbo"
+# Trial only (docs/design-flux-klein-trial.md): APP_FAST_TEXT_MODEL=flux2-klein makes text/fast use
+# FLUX.2 klein 4B (Apache-2.0, 4 steps) instead of Z-Image. Unset = unchanged behaviour.
+KLEIN_MODEL_ID = os.environ.get("APP_KLEIN_MODEL_ID", "black-forest-labs/FLUX.2-klein-4B")
+FAST_TEXT_MODEL = os.environ.get("APP_FAST_TEXT_MODEL", "zimage").strip().lower()
+KLEIN_STEPS = 4
 
 # ------------------------------------------------------------
 # PROMPT ENHANCER
@@ -227,6 +236,7 @@ cancel_events = {}
 qwen_pipeline = None
 zimage_pipeline = None
 zimage_img2img_pipeline = None  # shares weights with zimage_pipeline (from_pipe), so it costs no extra memory
+klein_pipeline = None
 current_model = None
 
 
@@ -771,9 +781,11 @@ def unload_qwen_pipeline():
 
 
 def unload_models():
-    global qwen_pipeline, zimage_pipeline, zimage_img2img_pipeline, current_model
+    global qwen_pipeline, zimage_pipeline, zimage_img2img_pipeline, klein_pipeline, current_model
     print("[MODEL] Unloading pipelines...")
     _drop_pipeline(qwen_pipeline)
+    _drop_pipeline(klein_pipeline)
+    klein_pipeline = None
     zimage_img2img_pipeline = None  # a view over zimage_pipeline's modules; drop it before the real pipeline
     _drop_pipeline(zimage_pipeline)
     qwen_pipeline = None
@@ -908,6 +920,24 @@ def get_zimage_pipeline():
     print(f"Z-Image-Turbo loaded on {DEVICE}.")
     log_memory("AFTER LOAD")
     return zimage_pipeline
+
+
+def get_klein_pipeline():
+    global klein_pipeline, current_model
+    if klein_pipeline is not None:
+        current_model = "flux2-klein-4b"
+        return klein_pipeline
+    if Flux2KleinPipeline is None:
+        raise RuntimeError("This diffusers build has no Flux2KleinPipeline")
+    unload_models()
+    print("=" * 60)
+    print(f"Loading {KLEIN_MODEL_ID}...")
+    print("=" * 60)
+    klein_pipeline = place_pipeline(load_pipeline(Flux2KleinPipeline, KLEIN_MODEL_ID), allow_offload=False)
+    current_model = "flux2-klein-4b"
+    print(f"FLUX.2 klein loaded on {DEVICE}.")
+    log_memory("AFTER LOAD")
+    return klein_pipeline
 
 
 # ============================================================
@@ -1524,6 +1554,11 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
                     kwargs["true_cfg_scale"] = 4.0
                     if negative_prompt.strip():
                         kwargs["negative_prompt"] = negative_prompt.strip()
+            elif FAST_TEXT_MODEL == "flux2-klein":
+                pipe = get_klein_pipeline()
+                n_steps = KLEIN_STEPS
+                kwargs = {"prompt": prompt, "height": height, "width": width,
+                          "num_inference_steps": KLEIN_STEPS, "guidance_scale": 1.0}
             else:
                 pipe = get_zimage_pipeline()
                 n_steps = 9

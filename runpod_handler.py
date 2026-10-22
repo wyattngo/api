@@ -62,7 +62,8 @@ vẫn quá lớn thì trả lỗi rõ ràng thay vì để gateway làm rơi k�
 ============================================================
 BIẾN MÔI TRƯỜNG (ngoài các APP_* của inference.py)
 ============================================================
-    RUNPOD_PRELOAD         qwen (mặc định) | zimage | none — nạp model lúc worker khởi động
+    RUNPOD_PRELOAD         qwen (mặc định) | zimage | flux2klein | none — nạp model lúc worker khởi động
+                           (flux2klein chỉ dùng cho endpoint thử, cùng APP_FAST_TEXT_MODEL=flux2-klein)
     RUNPOD_MAX_INLINE_MB   9      trần tổng base64 trong 1 response
     RUNPOD_ALLOW_URL_INPUT 1      cho phép images là URL http(s) (chặn IP nội bộ)
     RUNPOD_MAX_DOWNLOAD_MB 40     trần dung lượng mỗi ảnh tải từ URL
@@ -750,6 +751,8 @@ def preload_model():
     try:
         if which == "zimage":
             I.get_zimage_pipeline()
+        elif which == "flux2klein":
+            I.get_klein_pipeline()
         else:
             pipe = I.get_qwen_pipeline()
             I.set_qwen_mode(pipe, False)
