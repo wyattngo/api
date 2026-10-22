@@ -94,6 +94,18 @@ ZIMAGE_MODEL_ID = "Tongyi-MAI/Z-Image-Turbo"
 KLEIN_MODEL_ID = os.environ.get("APP_KLEIN_MODEL_ID", "black-forest-labs/FLUX.2-klein-4B")
 FAST_TEXT_MODEL = os.environ.get("APP_FAST_TEXT_MODEL", "zimage").strip().lower()
 KLEIN_STEPS = 4
+# Which features run on FLUX.2 klein instead of Qwen/Z-Image: comma list of
+# text, edit, compose, batch, rerender (or "all"). Empty = unchanged behaviour.
+# APP_FAST_TEXT_MODEL=flux2-klein is the old spelling of "text".
+_FLUX_ALL = {"text", "edit", "compose", "batch", "rerender"}
+FLUX_FEATURES = {f.strip() for f in os.environ.get("APP_FLUX_FEATURES", "").lower().split(",") if f.strip()}
+if "all" in FLUX_FEATURES:
+    FLUX_FEATURES = set(_FLUX_ALL)
+FLUX_FEATURES &= _FLUX_ALL
+
+
+def flux_enabled(feature):
+    return feature in FLUX_FEATURES or (feature == "text" and FAST_TEXT_MODEL == "flux2-klein")
 
 # ------------------------------------------------------------
 # PROMPT ENHANCER
@@ -794,6 +806,17 @@ def unload_qwen_pipeline():
     log_memory("AFTER QWEN UNLOAD")
 
 
+def unload_klein_pipeline():
+    global klein_pipeline, current_model
+    if klein_pipeline is not None:
+        print("[MODEL] Unloading FLUX.2 klein pipeline...", flush=True)
+        _drop_pipeline(klein_pipeline)
+    klein_pipeline = None
+    if current_model == "flux2-klein-4b":
+        current_model = None
+    free_memory(deep=True)
+
+
 def unload_models():
     global qwen_pipeline, zimage_pipeline, zimage_img2img_pipeline, klein_pipeline, current_model
     print("[MODEL] Unloading pipelines...")
@@ -1473,6 +1496,9 @@ class QwenSession:
     def step_count(self, steps):
         return TURBO_STEPS if self.turbo else steps
 
+    def sampling_kwargs(self, steps):
+        return qwen_sampling_kwargs(self.turbo, steps)
+
     def render(self, *, prompt, image, width, height, steps, seed, out_path, reporter, tag):
         err = None
         for attempt in (1, 2):
@@ -1481,7 +1507,7 @@ class QwenSession:
             kwargs = result = img = g = None
             try:
                 kwargs = {"prompt": prompt, "image": image, "height": height, "width": width}
-                kwargs.update(qwen_sampling_kwargs(self.turbo, steps))
+                kwargs.update(self.sampling_kwargs(steps))
                 g = make_generator(seed)
                 if g is not None:
                     kwargs["generator"] = g
@@ -1535,6 +1561,40 @@ class QwenSession:
 
 
 
+class KleinSession(QwenSession):
+    """Same interface as QwenSession for the 8-case batch / re-render, but renders on FLUX.2 klein
+    (4 fixed steps, no CFG). `turbo` mirrors `draft` so job labels stay "draft"/"final"."""
+
+    def __init__(self, draft, notify=None):
+        self.draft = draft
+        self.notify = notify or (lambda msg: None)
+        self.pipe = get_klein_pipeline()
+        self.turbo = draft
+        self.steady_gb = None
+        self.cases_since_load = 0
+
+    def recycle(self, reason):
+        msg = f"Nạp lại FLUX.2 klein để giải phóng bộ nhớ ({reason})"
+        print("=" * 60 + f"\n[RECYCLE] {msg}\n" + "=" * 60, flush=True)
+        self.notify(msg)
+        old_pipe = self.pipe
+        self.pipe = None
+        _drop_pipeline(old_pipe)
+        del old_pipe
+        unload_klein_pipeline()
+        free_memory(deep=True)
+        self.pipe = get_klein_pipeline()
+        self.steady_gb = None
+        self.cases_since_load = 0
+        log_memory("AFTER KLEIN RECYCLE")
+
+    def step_count(self, steps):
+        return KLEIN_STEPS
+
+    def sampling_kwargs(self, steps):
+        return {"num_inference_steps": KLEIN_STEPS, "guidance_scale": 1.0}
+
+
 # ============================================================
 # SINGLE GENERATION
 # ============================================================
@@ -1545,7 +1605,18 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
         kwargs = image = g = None
         try:
             # quality="fine" runs plain text-to-image on Qwen (no reference image) instead of Z-Image.
-            if mode in ("edit", "transparent", "compose") or (mode == "text" and quality == "fine"):
+            use_klein_ref = ((mode == "edit" and quality == "fast" and flux_enabled("edit"))
+                             or (mode == "compose" and flux_enabled("compose")))
+            if use_klein_ref:
+                # FLUX.2 klein takes one or many reference images natively (edit / multi-image compose).
+                unload_qwen_pipeline()
+                pipe = get_klein_pipeline()
+                n_steps = KLEIN_STEPS
+                kwargs = {"prompt": prompt, "height": height, "width": width,
+                          "num_inference_steps": KLEIN_STEPS, "guidance_scale": 1.0}
+                if refs:
+                    kwargs["image"] = refs[0] if len(refs) == 1 else refs
+            elif mode in ("edit", "transparent", "compose") or (mode == "text" and quality == "fine"):
                 pipe = get_qwen_pipeline()
                 # Fast edit = Qwen with the 6-step turbo LoRA (no true CFG). Falls back to the full
                 # schedule when the LoRA could not be loaded.
@@ -1568,7 +1639,7 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
                     kwargs["true_cfg_scale"] = 4.0
                     if negative_prompt.strip():
                         kwargs["negative_prompt"] = negative_prompt.strip()
-            elif FAST_TEXT_MODEL == "flux2-klein":
+            elif flux_enabled("text"):
                 pipe = get_klein_pipeline()
                 n_steps = KLEIN_STEPS
                 kwargs = {"prompt": prompt, "height": height, "width": width,
@@ -1685,13 +1756,14 @@ def run_8_cases(job_id, product_images, aspect_ratio, resolution, steps, seed,
             update_batch(job_id, status="cancelled", percent=100,
                          message="Đã huỷ trước khi load Qwen.", persist=True)
             return
+        use_klein = flux_enabled("batch")
         update_batch(job_id, status="running", percent=20 if prompt_enhance else 0,
-                     message="Loading Qwen-Image-2.1", persist=True)
-        session = QwenSession(
+                     message="Loading FLUX.2 klein" if use_klein else "Loading Qwen-Image-2.1", persist=True)
+        session = (KleinSession if use_klein else QwenSession)(
             draft=(mode == "draft"),
             notify=lambda m: update_batch(job_id, message=m, warning=m),
         )
-        if mode == "draft" and not session.turbo:
+        if mode == "draft" and not session.turbo and not use_klein:
             steps = min(steps, 20)
             update_batch(job_id, warning=f"Turbo không khả dụng ({qwen_state['turbo_error']}); chạy base {steps} bước")
 
@@ -1789,7 +1861,8 @@ def run_rerender(job_id, case_numbers, steps):
         update_batch(job_id, status="running", percent=0, warning=None, message="Loading base model", persist=True)
         loaded = load_references(case_dir)
         reference = loaded[0] if len(loaded) == 1 else loaded
-        session = QwenSession(draft=False, notify=lambda m: update_batch(job_id, message=m, warning=m))
+        session_cls = KleinSession if flux_enabled("rerender") else QwenSession
+        session = session_cls(draft=False, notify=lambda m: update_batch(job_id, message=m, warning=m))
         manifest = load_prompt_manifest(case_dir)
         raw = build_case_prompts(params.get("description", ""), params.get("color_note", ""), "",
                                  params.get("ref_count", 1), params.get("category", product_category.GENERIC))
