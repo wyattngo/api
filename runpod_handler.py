@@ -26,7 +26,7 @@ action = "generate" (mặc định)  — tương đương POST /generate
       mode "transparent": fast = chỉ rembg (tách nền, giữ kích thước ảnh gốc, cần 1 ảnh trong images),
                           fine = Qwen tạo ảnh RGBA
       mode "edit":        fast = Z-Image image-to-image (1 ảnh), fine = Qwen
-      mode "compose":     ghép 2..10 ảnh bằng Qwen, chỉ có quality "fine"
+      mode "compose":     ghép 2..10 ảnh bằng Qwen, chỉ có quality "fine" (APP_FLUX_FEATURES có compose: FLUX.2 klein, cả fast)
 
 action = "batch"  — tương đương POST /generate-8-cases
     images (bắt buộc), aspect_ratio ("auto" mặc định), resolution, steps, seed, description,
@@ -62,6 +62,7 @@ vẫn quá lớn thì trả lỗi rõ ràng thay vì để gateway làm rơi k�
 ============================================================
 BIẾN MÔI TRƯỜNG (ngoài các APP_* của inference.py)
 ============================================================
+    APP_FLUX_FEATURES      danh sách text,edit,compose,batch,rerender (hoặc all) chạy bằng FLUX.2 klein
     RUNPOD_PRELOAD         qwen (mặc định) | zimage | flux2klein | none — nạp model lúc worker khởi động
                            (flux2klein chỉ dùng cho endpoint thử, cùng APP_FAST_TEXT_MODEL=flux2-klein)
     RUNPOD_MAX_INLINE_MB   9      trần tổng base64 trong 1 response
@@ -496,7 +497,7 @@ def action_generate(inp, job):
     if mode == "compose":
         # Merge 2..N pictures into one with Qwen. There is no fast level: Z-Image's multi-image
         # pipeline (Omni) needs a different checkpoint that this image does not ship.
-        if quality != "fine":
+        if quality != "fine" and not I.flux_enabled("compose"):
             raise BadInput("Compose mode only supports quality 'fine'.")
         if len(refs) < 2:
             raise BadInput("Compose mode needs at least 2 reference images.")
