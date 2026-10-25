@@ -201,3 +201,32 @@ def apply_category(case_slug, intent, category):
     base = cat["overrides"].get(case_slug, intent)
     note = cat["notes"].get(case_slug)
     return f"{base} {note}" if note else base
+
+
+# Câu bố cục khoá ở CUỐI prompt, nối sau khi Prompt Enhancer đã viết lại (PE viết lại intent thành
+# văn xuôi mới nên câu "leave generous empty space" trong intent hay bị bỏ hoặc làm mờ; câu này thì
+# nối sau PE nên giữ nguyên từng chữ). Chỉ case có chữ sẽ được thêm sau (launch_announcement) mới có.
+LAYOUT_CASE = "launch_announcement"
+LAYOUT_BASE = (
+    "Composition lock: the entire product, including its outer edges, stays fully inside the frame "
+    "and never touches or crosses an edge; it fills no more than about 45% of the frame width and "
+    "45% of the frame height and sits in the lower right of the frame. The top third and the left "
+    "side of the frame stay plain empty background with no objects, props or graphic elements, "
+    "reserved for the headline text. Do not render any text, letters or numbers in the empty area."
+)
+# Thêm theo hình dáng đặc trưng của danh mục, chỉ để chỗ dễ tràn khung nhất được nhắc tên.
+LAYOUT_SHAPE = {
+    "fashion_apparel": "The whole garment is visible with its sleeves, hem and collar inside the frame.",
+    "bags_footwear": "The whole item is visible with its straps, handles or laces inside the frame.",
+    "home_living": "A large piece is scaled down so that all of it fits inside the frame.",
+}
+
+
+def layout_clause(case_slug, category=GENERIC):
+    """Câu bố cục cố định cho một case, hoặc "" nếu case đó không khoá bố cục.
+
+    Áp cho cả `generic`: lỗi tràn khung không phụ thuộc danh mục."""
+    if case_slug != LAYOUT_CASE:
+        return ""
+    shape = LAYOUT_SHAPE.get(category)
+    return f"{LAYOUT_BASE} {shape}" if shape else LAYOUT_BASE
