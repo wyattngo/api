@@ -91,6 +91,7 @@ from pathlib import Path
 
 # QUAN TRỌNG: import inference TRƯỚC mọi thứ có thể kéo torch vào; inference.py đặt
 # PYTORCH_ENABLE_MPS_FALLBACK / watermark trước `import torch`.
+import bucket_upload
 import inference as I
 
 from PIL import Image, ImageOps
@@ -312,9 +313,10 @@ def package_images(job_id, files, fmt, output):
                 data, mime, ext = _encode(path, fmt)
                 upload_path = path.with_suffix("." + ext)
                 upload_path.write_bytes(data)
-            url = rp_upload.upload_image(job_id, str(upload_path))
+            bucket, key, url = bucket_upload.upload(job_id, len(packaged), upload_path, mime)
             packaged.append({"format": fmt, "mime": mime,
-                             "bytes": upload_path.stat().st_size, "url": url})
+                             "bytes": upload_path.stat().st_size, "url": url,
+                             "bucket": bucket, "key": key})
         return packaged, warnings
 
     def build(target_fmt):
