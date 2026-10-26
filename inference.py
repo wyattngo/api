@@ -1675,7 +1675,8 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
             image.save(OUTPUT_DIR / filename, format="PNG")
             payload = {"success": True, "filename": filename, "url": f"/images/{filename}",
                        "width": image.width, "height": image.height, "seed": seed,
-                       "mode": mode, "input_reference_processed": bool(mode == "transparent" and refs)}
+                       "mode": mode, "model": current_model,
+                       "input_reference_processed": bool(mode == "transparent" and refs)}
             if warning:
                 payload["warning"] = warning
         except Exception as exc:
@@ -1861,7 +1862,7 @@ def run_8_cases(job_id, product_images, aspect_ratio, resolution, steps, seed,
         cancel_events.pop(job_id, None)
 
 
-def run_rerender(job_id, case_numbers, steps):
+def run_rerender(job_id, case_numbers, steps, use_flux=False):
     cancel = cancel_events.get(job_id) or threading.Event()
     session = None
     try:
@@ -1873,7 +1874,7 @@ def run_rerender(job_id, case_numbers, steps):
         update_batch(job_id, status="running", percent=0, warning=None, message="Loading base model", persist=True)
         loaded = load_references(case_dir)
         reference = loaded[0] if len(loaded) == 1 else loaded
-        session_cls = KleinSession if flux_enabled("rerender") else QwenSession
+        session_cls = KleinSession if (use_flux or flux_enabled("rerender")) else QwenSession
         session = session_cls(draft=False, notify=lambda m: update_batch(job_id, message=m, warning=m))
         manifest = load_prompt_manifest(case_dir)
         raw = build_case_prompts(params.get("description", ""), params.get("color_note", ""), "",
@@ -2045,4 +2046,5 @@ def health_info():
             "running": progress["running"], "memory": get_memory_info(),
             "queue": queue_status(),
             "turbo": {"loaded": qwen_state["turbo_loaded"], "error": qwen_state["turbo_error"]},
+            "flux": {"features": sorted(FLUX_FEATURES), "only": FLUX_ONLY},
             "prompt_enhancer": {"enabled": PROMPT_ENHANCER_ENABLED, "loaded": prompt_enhancer_model is not None}}

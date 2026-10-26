@@ -21,12 +21,15 @@ action = "generate" (mặc định)  — tương đương POST /generate
     prompt (bắt buộc), mode: "text" | "edit" | "transparent", aspect_ratio, resolution
     (1024/1536/2048), steps (20/30/40), seed (-1 = ngẫu nhiên), cfg, negative_prompt,
     remove_bg (mặc định true). mode "edit" bắt buộc có images.
-    quality: "fast" (mặc định) | "fine".
+    quality: "fast" (mặc định) | "fine" | "flux" (FLUX.2 klein; cần worker có klein).
       mode "text":        fast = Z-Image (9 bước cố định), fine = Qwen text-to-image (dùng steps/cfg)
       mode "transparent": fast = chỉ rembg (tách nền, giữ kích thước ảnh gốc, cần 1 ảnh trong images),
                           fine = Qwen tạo ảnh RGBA
-      mode "edit":        fast = Z-Image image-to-image (1 ảnh), fine = Qwen
+      mode "edit":        fast = Qwen + LoRA turbo 6 bước (1 ảnh), fine = Qwen đủ bước
       mode "compose":     ghép 2..10 ảnh bằng Qwen, chỉ có quality "fine" (APP_FLUX_FEATURES có compose: FLUX.2 klein, cả fast)
+      quality "flux":     text / edit / compose chạy FLUX.2 klein (4 bước cố định, không cfg);
+                          mode "transparent" không có FLUX (không ra alpha) -> báo lỗi
+    Response có "model": model đã chạy ("qwen-2.1", "zimage", "flux2-klein-4b", "rembg").
 
 action = "batch"  — tương đương POST /generate-8-cases
     images (bắt buộc), aspect_ratio ("auto" mặc định), resolution, steps, seed, description,
@@ -34,7 +37,10 @@ action = "batch"  — tương đương POST /generate-8-cases
     bags_footwear | jewelry_watches | electronics | home_living): danh mục sản phẩm, quyết định
     câu bổ sung của từng case; "auto" đoán từ description, không khớp thì "generic" (prompt gốc),
     remove_bg (true), mode: "draft" (mặc định) | "final", prompt_enhance (true),
+    quality: "flux" ép cả bộ chạy FLUX.2 klein (draft và final). Không gửi: Qwen, trừ khi
+    APP_FLUX_FEATURES có batch (khi đó chỉ draft chạy FLUX, final vẫn Qwen).
     return_references (false), return_prompts (true)
+    params.engine trong kết quả: "flux" | "qwen".
 
 action = "rerender"  — tương đương POST /rerender-final
     RunPod worker không giữ trạng thái giữa các job (đĩa cục bộ mất khi worker tắt), nên
@@ -42,6 +48,8 @@ action = "rerender"  — tương đương POST /rerender-final
       images   ảnh GỐC (worker tự tách nền lại theo params.remove_bg)
       cases    [1, 3, 8]  (1..8)
       steps    20/30/40
+      quality  "flux" chạy lại bằng FLUX.2 klein; không gửi: Qwen (trừ khi APP_FLUX_FEATURES có
+               rerender). Kết quả có "engine".
       params   object "params" nhận từ kết quả batch
       prompts  list "prompts" nhận từ kết quả batch (không gửi => dùng prompt fallback)
 
@@ -462,7 +470,7 @@ def _cutout_fast(refs, job, fmt, output):
     try:
         cut.save(out_file, format="PNG")
         images, warnings = package_images(job.get("id") or new_job_id(), [out_file], fmt, output)
-        response = {"success": True, "mode": "transparent", "quality": "fast", "seed": 0,
+        response = {"success": True, "mode": "transparent", "quality": "fast", "model": "rembg", "seed": 0,
                     "width": cut.width, "height": cut.height, "image": images[0]}
         if warning:
             warnings.append(warning)
@@ -532,6 +540,7 @@ def action_generate(inp, job):
         images, warnings = package_images(job.get("id") or new_job_id(), [out_file], fmt, output)
         response = {"success": True, "mode": mode, "quality": quality, "seed": seed,
                     "width": result["width"], "height": result["height"],
+                    "model": result.get("model"),
                     "input_reference_processed": result.get("input_reference_processed", False),
                     "image": images[0]}
         if result.get("warning"):
@@ -576,6 +585,7 @@ def action_batch(inp, job):
     params = {"aspect_ratio": aspect_ratio, "aspect_auto": aspect_auto, "resolution": resolution,
               "steps": steps, "seed": seed, "description": description, "remove_bg": remove_bg,
               "category": category, "category_source": category_source,
+              "engine": "flux" if use_flux else "qwen",
               "mode": mode, "prompt_enhance": prompt_enhance, "ref_count": len(images)}
     new_job(job_id, params)
     case_dir = I.BATCH_DIR / job_id
@@ -628,6 +638,9 @@ def action_rerender(inp, job):
     output, fmt = output_options(inp)
     numbers = parse_case_numbers(inp.get("cases"))
     steps = pick(as_int(inp.get("steps"), 40, "steps"), VALID_STEPS, 40)
+    # The final level normally stays on Qwen even after a FLUX draft; quality "flux" or
+    # APP_FLUX_FEATURES=...rerender moves the re-render to FLUX as well.
+    use_flux = str(inp.get("quality") or "").strip().lower() == "flux" or I.flux_enabled("rerender")
 
     p_in = inp.get("params")
     if not isinstance(p_in, dict):
@@ -680,7 +693,7 @@ def action_rerender(inp, job):
                 json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
         with ProgressPump(job, _job_progress(job_id)):
-            I.run_rerender(job_id, numbers, steps)
+            I.run_rerender(job_id, numbers, steps, use_flux)
 
         j = I.get_job(job_id) or {}
         finals = []
@@ -695,6 +708,7 @@ def action_rerender(inp, job):
         packaged, warnings = package_images(job_id, [f for _, f in finals], fmt, output)
         response = {
             "success": True, "job_id": job_id, "status": j.get("status"), "steps": steps,
+            "engine": "flux" if use_flux else "qwen",
             "cases": [{"case": n, "filename": f.name, "image": pkg}
                       for (n, f), pkg in zip(finals, packaged)],
         }
