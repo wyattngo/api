@@ -30,6 +30,9 @@ action = "generate" (mặc định)  — tương đương POST /generate
 
 action = "batch"  — tương đương POST /generate-8-cases
     images (bắt buộc), aspect_ratio ("auto" mặc định), resolution, steps, seed, description,
+    category ("auto" mặc định | "generic" | beauty | food_beverage | fashion_apparel |
+    bags_footwear | jewelry_watches | electronics | home_living): danh mục sản phẩm, quyết định
+    câu bổ sung của từng case; "auto" đoán từ description, không khớp thì "generic" (prompt gốc),
     remove_bg (true), mode: "draft" (mặc định) | "final", prompt_enhance (true),
     return_references (false), return_prompts (true)
 
@@ -93,6 +96,7 @@ from pathlib import Path
 # PYTORCH_ENABLE_MPS_FALLBACK / watermark trước `import torch`.
 import bucket_upload
 import inference as I
+import product_category
 
 from PIL import Image, ImageOps
 
@@ -551,6 +555,10 @@ def action_batch(inp, job):
     if seed < 0:
         seed = random.SystemRandom().randint(0, 2**31 - 16)
     description = str(inp.get("description") or "")
+    try:
+        category, category_source = product_category.resolve_category(inp.get("category"), description)
+    except ValueError as exc:
+        raise BadInput(str(exc))
     remove_bg = as_bool(inp.get("remove_bg"), True)
     mode = pick(str(inp.get("mode", "draft")).strip().lower(), {"draft", "final"}, "draft")
     prompt_enhance = as_bool(inp.get("prompt_enhance"), True)
@@ -561,6 +569,7 @@ def action_batch(inp, job):
     job_id = new_job_id()
     params = {"aspect_ratio": aspect_ratio, "aspect_auto": aspect_auto, "resolution": resolution,
               "steps": steps, "seed": seed, "description": description, "remove_bg": remove_bg,
+              "category": category, "category_source": category_source,
               "mode": mode, "prompt_enhance": prompt_enhance, "ref_count": len(images)}
     new_job(job_id, params)
     case_dir = I.BATCH_DIR / job_id
@@ -568,7 +577,7 @@ def action_batch(inp, job):
     try:
         with ProgressPump(job, _job_progress(job_id)):
             I.run_8_cases(job_id, images, aspect_ratio, resolution, steps, seed, description,
-                          remove_bg, mode, prompt_enhance, aspect_auto)
+                          remove_bg, mode, prompt_enhance, aspect_auto, category)
 
         j = I.get_job(job_id) or {}
         status = j.get("status")
@@ -630,6 +639,8 @@ def action_rerender(inp, job):
         "steps": steps, "seed": seed,
         "description": str(p_in.get("description") or ""),
         "color_note": str(p_in.get("color_note") or ""),
+        "category": (str(p_in.get("category") or "") if str(p_in.get("category") or "") in
+                     (*product_category.CATEGORIES, product_category.GENERIC) else product_category.GENERIC),
         "remove_bg": as_bool(p_in.get("remove_bg"), True),
         "ref_count": len(images),
     }

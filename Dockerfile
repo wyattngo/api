@@ -43,6 +43,7 @@ PY
 # ============================================================
 WORKDIR /app
 COPY inference.py /app/inference.py
+COPY product_category.py /app/product_category.py
 COPY runpod_handler.py /app/runpod_handler.py
 COPY bucket_upload.py /app/bucket_upload.py
 

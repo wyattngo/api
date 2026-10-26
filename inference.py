@@ -50,6 +50,8 @@ from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image, ImageFilter
+
+import product_category
 from diffusers import QwenImage21Pipeline, ZImagePipeline, ZImageImg2ImgPipeline, FlowMatchEulerDiscreteScheduler
 try:
     from diffusers import Flux2KleinPipeline
@@ -384,23 +386,28 @@ def build_pe_instruction(intent, index, total, description="", palette_hint="", 
             f"the reference image(s).{multi_note}{note}")
 
 
-def build_fallback_prompt(intent, description="", color_note="", ref_count=1):
+def build_fallback_prompt(intent, description="", color_note="", ref_count=1, layout=""):
     desc_sentence = f" The product is {description}." if description else ""
     intro = FALLBACK_INTRO.format(description_sentence=desc_sentence)
     if ref_count > 1:
         intro = intro.rstrip() + " " + MULTI_REF_CLAUSE + MULTI_REF_QWEN_CLAUSE + "\n\n"
     if color_note:
         intro = intro.rstrip() + " " + color_note + "\n\n"
-    return intro + intent + FALLBACK_OUTRO
+    return intro + intent + FALLBACK_OUTRO + ((" " + layout) if layout else "")
 
 
-def build_case_prompts(description="", color_note="", palette_hint="", ref_count=1):
+def build_case_prompts(description="", color_note="", palette_hint="", ref_count=1, category=product_category.GENERIC):
+    """`category` là slug đã được `product_category.resolve_category` chốt; generic = intent gốc."""
     description = (description or "").strip().rstrip(".")
     total = len(CASE_INTENTS)
-    return [{"slug": slug, "name": name,
-             "intent": build_pe_instruction(intent, i + 1, total, description, palette_hint, ref_count),
-             "fallback": build_fallback_prompt(intent, description, color_note, ref_count)}
-            for i, (slug, name, intent) in enumerate(CASE_INTENTS)]
+    out = []
+    for i, (slug, name, base_intent) in enumerate(CASE_INTENTS):
+        intent = product_category.apply_category(slug, base_intent, category)
+        layout = product_category.layout_clause(slug, category)
+        out.append({"slug": slug, "name": name, "category": category, "layout": layout,
+                    "intent": build_pe_instruction(intent, i + 1, total, description, palette_hint, ref_count),
+                    "fallback": build_fallback_prompt(intent, description, color_note, ref_count, layout)})
+    return out
 
 
 PRESERVE_CLAUSE = ("Keep the product exactly as in the reference image, with the same shape, parts, "
@@ -422,6 +429,14 @@ MULTI_REF_QWEN_CLAUSE = (
 # ============================================================
 # PROMPT ENHANCER — Qwen-Image-2.1-PE-I2I
 # ============================================================
+def append_fixed_clauses(rewritten, n_refs=1, color_note="", layout_clause=""):
+    """Các câu nối sau PE, không để PE viết lại; câu bố cục luôn là câu cuối."""
+    return (" ".join(rewritten.split()) + " " + PRESERVE_CLAUSE
+            + ((" " + MULTI_REF_CLAUSE) if n_refs > 1 else "")
+            + ((" " + color_note) if color_note else "")
+            + ((" " + layout_clause) if layout_clause else ""))
+
+
 def _pe_result(original, **extra):
     base = {"rewritten_prompt": original or "", "wh_ratio": "", "ratio_follow": "",
             "thinking": "", "raw": "", "parse_ok": False}
@@ -543,7 +558,7 @@ def _as_image_list(input_image):
     return list(input_image) if isinstance(input_image, (list, tuple)) else [input_image]
 
 
-def enhance_prompt(user_prompt, input_image, cancel=None, aspect_hint=None, color_note=""):
+def enhance_prompt(user_prompt, input_image, cancel=None, aspect_hint=None, color_note="", layout_clause=""):
     """input_image: một ảnh PIL hoặc list ảnh tham chiếu (tối đa 10, ảnh đầu là ảnh chính)."""
     images_in = _as_image_list(input_image)[:max(1, PROMPT_ENHANCER_MAX_IMAGES)]
     n_refs = len(images_in)
@@ -622,9 +637,7 @@ def enhance_prompt(user_prompt, input_image, cancel=None, aspect_hint=None, colo
                 print("[PE] Không parse được JSON -> dùng prompt gốc", flush=True)
                 return _pe_result(user_prompt, error="PE output không parse được (có thể bị cắt do max_new_tokens)",
                                   raw=(result.get("raw") or "")[-1500:])
-            result["rewritten_prompt"] = (" ".join(result["rewritten_prompt"].split()) + " " + PRESERVE_CLAUSE
-                                          + ((" " + MULTI_REF_CLAUSE) if n_refs > 1 else "")
-                                          + ((" " + color_note) if color_note else ""))
+            result["rewritten_prompt"] = append_fixed_clauses(result["rewritten_prompt"], n_refs, color_note, layout_clause)
             print("[PE] parse_ok=", result["parse_ok"], "wh_ratio=", result.get("wh_ratio"),
                   "ratio_follow=", result.get("ratio_follow"),
                   "prompt=", result["rewritten_prompt"][:700])
@@ -648,13 +661,14 @@ def enhance_case_prompts(cases, input_image, job_id=None, cancel=None, aspect_hi
             update_batch(job_id, case=index + 1, total=total,
                          percent=int(index / max(1, total) * 20),
                          message=f"Enhancing prompt {index + 1}/{total}: {name}", persist=True)
-        result = enhance_prompt(case["intent"], input_image, cancel=cancel, aspect_hint=aspect_hint, color_note=color_note)
+        result = enhance_prompt(case["intent"], input_image, cancel=cancel, aspect_hint=aspect_hint, color_note=color_note,
+                                layout_clause=case.get("layout", ""))
         if cancel is not None and cancel.is_set():
             raise GenerationCancelled()
         used_pe = bool(result.get("parse_ok") and result.get("rewritten_prompt"))
         final_prompt = result["rewritten_prompt"] if used_pe else case["fallback"]
         enhanced.append({
-            "slug": case["slug"], "name": name, "prompt": final_prompt,
+            "slug": case["slug"], "name": name, "category": case.get("category"), "prompt": final_prompt,
             "original_prompt": case["intent"], "enhanced_prompt": final_prompt,
             "fallback_prompt": case["fallback"],
             "prompt_enhancer": {
@@ -1598,7 +1612,8 @@ def _generate_blocking(mode, prompt, refs, width, height, steps, seed, cfg, nega
 # 8-CASE WORKER
 # ============================================================
 def run_8_cases(job_id, product_images, aspect_ratio, resolution, steps, seed,
-                description, remove_bg, mode, prompt_enhance=True, aspect_auto=False):
+                description, remove_bg, mode, prompt_enhance=True, aspect_auto=False,
+                category=product_category.GENERIC):
     case_dir = BATCH_DIR / job_id
     cancel = cancel_events.get(job_id) or threading.Event()
     started = time.time()
@@ -1636,7 +1651,8 @@ def run_8_cases(job_id, product_images, aspect_ratio, resolution, steps, seed,
             p["color_note"] = color_note
             p["ref_count"] = n_refs
         update_batch(job_id, params=p, persist=True)
-        raw_cases = build_case_prompts(description, color_note, palette_hint, n_refs)
+        raw_cases = build_case_prompts(description, color_note, palette_hint, n_refs, category)
+        print(f"[CATEGORY] {category}", flush=True)
         if prompt_enhance and PROMPT_ENHANCER_ENABLED:
             update_batch(job_id, status="enhancing_prompts", percent=0,
                          message="Loading Prompt Enhancer", persist=True)
@@ -1657,7 +1673,7 @@ def run_8_cases(job_id, product_images, aspect_ratio, resolution, steps, seed,
             free_memory(deep=True)
         else:
             cases = [{
-                "slug": c["slug"], "name": c["name"], "prompt": c["fallback"],
+                "slug": c["slug"], "name": c["name"], "category": c["category"], "prompt": c["fallback"],
                 "original_prompt": c["intent"], "enhanced_prompt": c["fallback"],
                 "fallback_prompt": c["fallback"],
                 "prompt_enhancer": {"parse_ok": False, "disabled": True},
@@ -1776,7 +1792,7 @@ def run_rerender(job_id, case_numbers, steps):
         session = QwenSession(draft=False, notify=lambda m: update_batch(job_id, message=m, warning=m))
         manifest = load_prompt_manifest(case_dir)
         raw = build_case_prompts(params.get("description", ""), params.get("color_note", ""), "",
-                                 params.get("ref_count", 1))
+                                 params.get("ref_count", 1), params.get("category", product_category.GENERIC))
         fallback = {
             i + 1: {"slug": c["slug"], "name": c["name"], "prompt": c["fallback"],
                     "original_prompt": c["intent"], "enhanced_prompt": c["fallback"]}
