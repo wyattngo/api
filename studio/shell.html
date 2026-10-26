@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cutin Image</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/*@DS_TOKENS@*/
+/*@DS_BUNDLE@*/
+/*@STUDIO_CSS@*/
+</style>
+</head>
+<body>
+<div class="app" id="app" data-open="" data-side="open">
+  <header class="top">
+    <button type="button" class="cu-btn cu-btn-ghost histbtn" id="histbtn" aria-label="Lịch sử" aria-haspopup="dialog" aria-expanded="false"><span class="ic" id="hist-ic" aria-hidden="true"></span><span class="lbl">Lịch sử</span></button>
+    <span class="logo">Cutin Image</span>
+    <span class="sp"></span>
+    <button type="button" class="cu-btn cu-btn-ghost" id="newsession" aria-label="Phiên mới"><span class="ic" id="newsession-ic" aria-hidden="true"></span><span class="lb lbl">Phiên mới</span></button>
+    <a class="cu-btn cu-btn-ghost xl" href="/docs">Tài liệu API</a>
+    <a class="cu-btn cu-btn-ghost xl" href="https://cutin.dev">cutin.dev</a>
+    <button type="button" class="cu-btn acct" id="acct" aria-haspopup="menu" aria-expanded="false"><span class="av" id="acct-av" aria-hidden="true"></span><span id="acct-txt" class="lbl">Đăng nhập</span></button>
+    <button type="button" class="cu-ibtn cu-ibtn-quiet" id="theme" aria-label="Chuyển giao diện"></button>
+  </header>
+
+  <main class="work">
+    <aside class="side" id="side" aria-label="Lịch sử" hidden>
+      <div class="dhead"><h3>Lịch sử</h3><button type="button" class="cu-ibtn cu-ibtn-quiet bare" id="side-close" aria-label="Đóng"></button></div>
+      <div class="hlist" id="hlist"></div>
+      <p class="note dnote">Chỉ hiện 12 ảnh gần nhất từ máy chủ; lưu lịch sử lâu hơn chưa có.</p>
+    </aside>
+    <section class="thread" aria-label="Hội thoại">
+      <div class="turns-wrap"><div class="turns" id="turns" role="log" aria-live="polite"></div></div>
+      <div class="dock" id="dock">
+        <div class="attached" id="attached"></div>
+        <div class="comp" id="composer">
+          <div class="r1">
+            <textarea class="comp-input" id="prompt" rows="1" aria-label="Nhắn cho Cutin"></textarea>
+            <span class="cost" id="cost"></span>
+          </div>
+          <div class="bar2">
+            <button type="button" class="cu-ibtn cu-ibtn-quiet bare" id="attach" aria-label="Đính kèm ảnh"></button>
+            <input type="file" id="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+            <div class="fade-x grow"><div class="hscroll chips-in" id="chips"></div></div>
+            <button type="button" class="cu-ibtn" id="send" aria-label="Gửi"></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="canvas" id="canvas" aria-label="Canvas"></section>
+  </main>
+
+  <div class="scrim" id="scrim"></div>
+  <div class="pop sheetpop" id="opts" hidden></div>
+  <div class="pop acct-menu" id="acct-menu" hidden>
+    <ul class="cu-menu" role="menu">
+      <li role="none" class="cm-only"><a class="cu-menu-item" role="menuitem" href="/docs">Tài liệu API</a></li>
+      <li role="none" class="cm-only"><a class="cu-menu-item" role="menuitem" href="https://cutin.dev">cutin.dev</a></li>
+      <li role="none"><a class="cu-menu-item" role="menuitem" href="https://zalo.me/0907674430" target="_blank" rel="noopener">Nhắn Zalo để thêm lượt</a></li>
+      <li role="none"><button type="button" class="cu-menu-item" role="menuitem" id="signout">Đăng xuất</button></li>
+    </ul>
+  </div>
+  <section class="view" id="view" role="dialog" aria-modal="true" aria-label="Xem ảnh" hidden></section>
+  <div class="cu-toast toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+<script>
+/*@STUDIO_JS@*/
+</script>
+</body>
+</html>

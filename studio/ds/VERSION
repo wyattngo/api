@@ -1,0 +1,6 @@
+Cutin AI Design System
+artifact: https://claude.ai/artifact/2MD8SNCgV7g7NB1npJua6z
+version: 1792430800-12eb (v27, adds ResultGrid layout "set")
+vendored: 2026-10-20
+files: tokens.css, bundle.css (plain CSS, copied as-is)
+update: replace both files from the artifact, update this file, run python3 scripts/gen_pages.py

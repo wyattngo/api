@@ -1,0 +1,228 @@
+/* Cutin AI Design System — generated from tokens.json */
+:root, [data-theme="dark"] {
+  --fuchsia-50: #fcf2fb; /* Brand ramp, hue 328. Primary is 600. */
+  --fuchsia-100: #f9e3f8; /* Brand ramp, hue 328. Primary is 600. */
+  --fuchsia-200: #f4caf2; /* Brand ramp, hue 328. Primary is 600. */
+  --fuchsia-300: #eca5e9; /* Brand ramp, hue 328. Primary is 600. */
+  --fuchsia-400: #de78dc; /* Brand ramp, hue 328. Primary is 600. */
+  --fuchsia-500: #d051cf; /* Brand ramp, hue 328. Primary is 600. */
+  --fuchsia-600: #bb31bc; /* Brand ramp, hue 328. Primary is 600. */
+  --fuchsia-700: #9a229a; /* Brand ramp, hue 328. Primary is 600. */
+  --fuchsia-800: #771977; /* Brand ramp, hue 328. Primary is 600. */
+  --fuchsia-900: #561456; /* Brand ramp, hue 328. Primary is 600. */
+  --fuchsia-950: #300a30; /* Brand ramp, hue 328. Primary is 600. */
+  --red-400: #f4776c; /* No usage note yet: add one to the base tokens.json. */
+  --red-500: #e84d45; /* No usage note yet: add one to the base tokens.json. */
+  --red-600: #d32b2a; /* No usage note yet: add one to the base tokens.json. */
+  --red-700: #ad1b1c; /* No usage note yet: add one to the base tokens.json. */
+  --amber-500: #d98324; /* No usage note yet: add one to the base tokens.json. */
+  --n-0: #ffffff; /* Cool neutral ramp. */
+  --n-50: #f7f8f9; /* Cool neutral ramp. */
+  --n-100: #edeef1; /* Cool neutral ramp. */
+  --n-200: #dfe1e6; /* Cool neutral ramp. */
+  --n-300: #c6cad1; /* Cool neutral ramp. */
+  --n-400: #9aa0aa; /* Cool neutral ramp. */
+  --n-500: #78808b; /* Cool neutral ramp. No role points here: fails AA as text on surface. */
+  --n-600: #5a616b; /* Cool neutral ramp. */
+  --n-700: #434952; /* Cool neutral ramp. */
+  --n-800: #2e333a; /* Cool neutral ramp. */
+  --n-900: #1e2126; /* Cool neutral ramp. */
+  --n-950: #14171a; /* Cool neutral ramp. */
+  --n-1000: #0b0c0e; /* Cool neutral ramp. */
+  --bg: #0b0c0e; /* Page ground. Surface 1 of the two. */
+  --surface: #14171a; /* The only elevated surface: bubbles, dialogs, cards. Replaces borders. */
+  --text: #edeef1; /* Primary text on bg and surface (16.9:1 dark). */
+  --text-secondary: #dfe1e6; /* Sub-heads and value props; stronger than muted. */
+  --text-muted: #9aa0aa; /* Captions, placeholders, quiet actions (7.4:1 on bg dark). */
+  --text-faint: #7f8691; /* Labels and disabled text only. 4.90:1 on surface dark, 4.70:1 light. */
+  --accent: #bb31bc; /* Fills: primary button, send. White label is 4.91:1. */
+  --accent-hover: #d051cf; /* Hover state of accent fills. */
+  --accent-text: #de78dc; /* Accent-coloured text and links. 7.29:1 on bg dark, 6.84:1 light. */
+  --accent-quiet: rgba(187,49,188,0.16); /* Tinted wash behind badges and selected rows. */
+  --on-accent: #ffffff; /* Label on accent and danger fills. */
+  --focus: #d051cf; /* 2px focus ring, offset 2px. */
+  --danger: #d32b2a; /* Destructive fill. Semantic only, never brand. */
+  --danger-text: #f4776c; /* Error text. */
+  --warning: #d98324; /* Warning fill; takes ink text (on-warning). */
+  --on-warning: #0b0c0e; /* Ink on amber; white on amber is 2.91:1. */
+  --warning-text: #d98324; /* Warning text. Amber is too light on white, so light steps down. */
+  --hairline: #2e333a; /* Exceptional separator only. Default borders are zero. */
+  --chart-1: #d051cf; /* Chart series 1 (admin overview only). */
+  --chart-2: #199e70; /* Chart series 2: aqua, not grey. Never text. */
+}
+[data-theme="light"] {
+  --fuchsia-50: #fcf2fb;
+  --fuchsia-100: #f9e3f8;
+  --fuchsia-200: #f4caf2;
+  --fuchsia-300: #eca5e9;
+  --fuchsia-400: #de78dc;
+  --fuchsia-500: #d051cf;
+  --fuchsia-600: #bb31bc;
+  --fuchsia-700: #9a229a;
+  --fuchsia-800: #771977;
+  --fuchsia-900: #561456;
+  --fuchsia-950: #300a30;
+  --red-400: #f4776c;
+  --red-500: #e84d45;
+  --red-600: #d32b2a;
+  --red-700: #ad1b1c;
+  --amber-500: #d98324;
+  --n-0: #ffffff;
+  --n-50: #f7f8f9;
+  --n-100: #edeef1;
+  --n-200: #dfe1e6;
+  --n-300: #c6cad1;
+  --n-400: #9aa0aa;
+  --n-500: #767d88;
+  --n-600: #5a616b;
+  --n-700: #434952;
+  --n-800: #2e333a;
+  --n-900: #1e2126;
+  --n-950: #14171a;
+  --n-1000: #0b0c0e;
+  --bg: #ffffff;
+  --surface: #f7f8f9;
+  --text: #0b0c0e;
+  --text-secondary: #434952;
+  --text-muted: #5a616b;
+  --text-faint: #69707b;
+  --accent: #bb31bc;
+  --accent-hover: #9a229a;
+  --accent-text: #9a229a;
+  --accent-quiet: rgba(187,49,188,0.09);
+  --on-accent: #ffffff;
+  --focus: #bb31bc;
+  --danger: #d32b2a;
+  --danger-text: #ad1b1c;
+  --warning: #d98324;
+  --on-warning: #0b0c0e;
+  --warning-text: #8a5210;
+  --hairline: #dfe1e6;
+  --chart-1: #bb31bc;
+  --chart-2: #139467;
+}
+:root {
+  --space-1: 4px; /* 4px base. Space replaces borders. */
+  --space-2: 8px; /* 4px base. Space replaces borders. */
+  --space-3: 12px; /* 4px base. Space replaces borders. */
+  --space-4: 16px; /* 4px base. Space replaces borders. */
+  --space-5: 20px; /* 4px base. Space replaces borders. */
+  --space-6: 24px; /* 4px base. Space replaces borders. */
+  --space-8: 32px; /* 4px base. Space replaces borders. */
+  --space-10: 40px; /* 4px base. Space replaces borders. */
+  --space-12: 48px; /* 4px base. Space replaces borders. */
+  --space-16: 64px; /* 4px base. Space replaces borders. */
+  --radius-box: 12px; /* Every rectangular surface: bubbles, dialogs, cards, buttons. */
+  --radius-full: 1000px; /* Pills, round buttons, discs. */
+  --control-h: 48px; /* Control height on mobile; 40px from 768px. */
+  --tap-min: 44px; /* Minimum touch target. */
+  --gutter: 24px; /* Page side padding; 32px from 768px. */
+  --page: 72rem; /* Outer page width. */
+  --measure: 38em; /* Reading line length. */
+  --dur-fast: 120ms; /* Hover, opacity. */
+  --dur-base: 180ms; /* Small state changes. */
+  --dur-slow: 280ms; /* Fades in. Opacity and small translate only. */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1); /* The one easing curve. */
+  --font-sans: "Be Vietnam Pro", "Be Vietnam Pro VN", Inter, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --text-hero: 600 56px/1.25 var(--font-sans); /* One per page. Fluid on the web: clamp(38px, 4.8vw, 56px). */
+  --text-h1: 600 34px/1.3 var(--font-sans); /* Page title (40px from 768px). */
+  --text-h2: 600 27px/1.3 var(--font-sans); /* Section title. */
+  --text-title: 600 22px/1.3 var(--font-sans); /* Card and dialog headings. */
+  --text-lead: 400 18px/1.65 var(--font-sans); /* Lead paragraph, dialog title at 500. */
+  --text-body: 400 16px/1.65 var(--font-sans); /* Chat messages and prose. Body leading 1.65 is the Vietnamese floor. */
+  --text-ui: 500 14px/1.4 var(--font-sans); /* Buttons, controls. */
+  --text-caption: 400 13px/1.4 var(--font-sans); /* Smallest size. 13px is the floor: Vietnamese tone marks vanish below it. */
+  --text-code: 400 14px/1.5 var(--font-sans); /* Inline and block code (mono). */
+}
+.hero {
+  font-family: var(--font-sans);
+  font-size: 56px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.h1 {
+  font-family: var(--font-sans);
+  font-size: 34px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.h2 {
+  font-family: var(--font-sans);
+  font-size: 27px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.title {
+  font-family: var(--font-sans);
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.lead {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 1.65;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.body {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.65;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.ui {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.caption {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.code {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("fonts/be-vietnam-pro-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("fonts/be-vietnam-pro-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Be Vietnam Pro VN";
+  src: url("fonts/be-vietnam-pro-vietnamese-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Be Vietnam Pro VN";
+  src: url("fonts/be-vietnam-pro-vietnamese-600-normal.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
