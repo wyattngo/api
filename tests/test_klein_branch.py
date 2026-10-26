@@ -43,3 +43,43 @@ def test_klein_uses_four_steps(monkeypatch):
 def test_default_stays_zimage(monkeypatch):
     kw = run(monkeypatch, "zimage")
     assert kw["num_inference_steps"] == 9 and kw["guidance_scale"] == 0.0
+
+
+def run_ref(monkeypatch, mode, quality, features, refs):
+    fake = FakePipe()
+    monkeypatch.setattr(I, "FLUX_FEATURES", set(features))
+    monkeypatch.setattr(I, "get_klein_pipeline", lambda: fake)
+    monkeypatch.setattr(I, "unload_qwen_pipeline", lambda: None)
+    monkeypatch.setattr(I, "get_qwen_pipeline", lambda: (_ for _ in ()).throw(AssertionError("qwen used")))
+    monkeypatch.setattr(I, "free_memory", lambda deep=False: None)
+    monkeypatch.setattr(I, "supports_step_callback", lambda pipe: False)
+    result = I._generate_blocking(mode, "merge", refs, 64, 64, 40, 1, False, "", quality=quality)
+    assert result["success"], result
+    (I.OUTPUT_DIR / result["filename"]).unlink()
+    return fake.kwargs
+
+
+def test_edit_fine_uses_klein(monkeypatch):
+    img = Image.new("RGB", (8, 8))
+    kw = run_ref(monkeypatch, "edit", "fine", {"edit"}, [img])
+    assert kw["image"] is img and kw["num_inference_steps"] == 4
+
+
+def test_compose_uses_klein_with_all_refs(monkeypatch):
+    imgs = [Image.new("RGB", (8, 8)), Image.new("RGB", (8, 8))]
+    kw = run_ref(monkeypatch, "compose", "fine", {"compose"}, imgs)
+    assert kw["image"] == imgs
+
+
+def test_all_expands(monkeypatch):
+    monkeypatch.setattr(I, "FLUX_FEATURES", set(I._FLUX_ALL))
+    assert all(I.flux_enabled(f) for f in ("text", "edit", "compose", "batch", "rerender"))
+
+
+def test_flux_only_worker_refuses_qwen_instead_of_running_out_of_memory(monkeypatch):
+    import pytest
+    monkeypatch.setattr(I, "FLUX_ONLY", True)
+    monkeypatch.setattr(I, "qwen_pipeline", None)
+    monkeypatch.setattr(I, "unload_models", lambda: (_ for _ in ()).throw(AssertionError("klein evicted")))
+    with pytest.raises(RuntimeError, match="only runs FLUX"):
+        I.get_qwen_pipeline()
